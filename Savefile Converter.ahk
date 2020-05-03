@@ -1,4 +1,11 @@
-﻿#Warn
+/*
+*Savefile Converter
+*By GreenBat
+*Version: 
+*	1.1 Last updated (29/04/2020)
+*	https://github.com/Green-Bat/Savefile-Converter
+*/
+#Warn
 #NoEnv
 #NoTrayIcon
 #SingleInstance, Ignore
@@ -6,7 +13,7 @@ ListLines, Off
 SetBatchLines, -1
 SetWorkingDir, % A_ScriptDir
 
-bytes := {"Arkham Knight": "00 10 25 00", "Arkham City": "00 80 04 00", "Arkham Asylum": ["00 00 01 00", "00 00 02 00"]}
+global EGbytes := {"Arkham Knight": "0 10 25 0", "Arkham City": "0 80 4 0", "Arkham Asylum": "0 0 1 0", "Arkham Asylum2": "0 0 2 0"}
 
 Gui, Main:New, +HwndmainHwnd, Savefile Converter
 Gui, Font, s11
@@ -20,24 +27,23 @@ return
 ;===============================================================================================================================
 
 Convert:
-	GuiControlGet, ToConvert,, Path ; Get the path from the edit box
-	GuiControlGet, ChosenGame,, Game ; Get the current choice of game
-	try Check(ToConvert, ChosenGame)
+	Gui, Main:Submit, NoHide ; Get the path from the edit box and the current choice of game
+	try Check(Path, Game)
 	catch e {
 		MsgBox, % e.Extra ? 48 : 16, Savefile Converter, % e.Message
 		return
 	}
-	MsgBox, 0, Savefile Converter, Conversion complete.
+	MsgBox, 64, Savefile Converter, Conversion complete.
 	GuiControl,, Path ; Empty the edit box
 	return
 ;===============================================================================================================================
 
 MainGuiDropFiles:
-	GuiControlGet, ChosenGame,, Game
+	Gui, Main:Submit, NoHide
 	filecount := 0
 	Loop, Parse, A_GuiEvent, `n
 	{
-		try Check(A_LoopField, ChosenGame)
+		try Check(A_LoopField, Game)
 		catch e {
 			MsgBox, % e.Extra ? 48 : 16, Savefile Converter, % e.Message
 			continue
@@ -45,7 +51,7 @@ MainGuiDropFiles:
 		filecount++
 	}
 	if (filecount > 0)
-		MsgBox, 0, Savefile Converter, Conversion complete.
+		MsgBox, 64, Savefile Converter, Conversion complete.
 	return
 ;===============================================================================================================================
 
@@ -53,11 +59,12 @@ Check(ToConvert, ChosenGame){
 	Gui, Main:+OwnDialogs
 	file_count := 0
 	, Name := SubStr(ToConvert, InStr(ToConvert, "\",, 0)+1)
+
 	if !(f := FileExist(ToConvert))
 		throw Exception("ERROR: Not a valid path!!!",, 0)
 	; If a file has "EG_" in its name it most likely means it was already converted
 	if (InStr(ToConvert, "EG_", true) && !(InStr(f, "D")))
-		throw Exception("File Already Converted",, 1)
+		throw Exception("File already converted",, 1)
 
 	; If it's a single file, run the converter once
 	if (InStr(ToConvert, ".sgd", true))
@@ -79,14 +86,13 @@ Check(ToConvert, ChosenGame){
 ;===============================================================================================================================
 
 Converter(ToConvert, Name, Game){
-	local SteamData:=""
-	, NewFile := SubStr(ToConvert, 1, -StrLen(Name)) . "EG_" . Name
-
-	EGF := FileOpen(NewFile, "w")
-	SteamF := FileOpen(ToConvert, "r")
+	NewFile := SubStr(ToConvert, 1, -StrLen(Name)) . "EG_" . Name
+	, EGF := FileOpen(NewFile, "w")
+	, SteamF := FileOpen(ToConvert, "r")
+	
 	; Insert the required bytes at the beginning of the file, depending on the choice of game
 	; if the file size is greater than 65kb insert the second set of bytes for Arkham Asylum
-	Loop, Parse, % (((SteamF.Length/1024) > 65) && (Game == "Arkham Asylum")) ? bytes[Game][2] : (Game == "Arkham Asylum") ? bytes[Game][1] : bytes[Game], % " "
+	Loop, Parse, % (((SteamF.Length/1024) > 65) && (Game == "Arkham Asylum")) ? EGbytes["Arkham Asylum2"] : EGbytes[Game], % " "
 		EGF.WriteUChar("0x" A_LoopField)
 	; Read the raw binary data from the steam savefile and write it to the converted savefile
 	SteamF.RawRead(RawData, SteamF.Length)
