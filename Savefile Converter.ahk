@@ -21,8 +21,6 @@ Gui, Main:Add, Text, xm yp+30 vtext, Drag and drop files or folders or enter the
 Gui, Font
 Gui, Main:Add, Edit, xm yp+25 wp+20 vPath
 Gui, Main:Add, Button, Default xp+127.5 yp+30 wp-255 h30 gConvert, > Convert <
-Gui, Main:Add, Progress, w310 h20 xp-127.5 yp-30 vProgressBar
-GuiControl, Hide, ProgressBar
 Gui, Main:Show, w340 h140
 return
 ;===============================================================================================================================
@@ -57,15 +55,17 @@ MainGuiDropFiles:
 ;===============================================================================================================================
 
 Check(ToConvert){
-	global EpicToSteam, SteamToEpic, ProgressBar
+	global EpicToSteam, SteamToEpic
 	
 	Gui, Main:+OwnDialogs
+	
 	file_count := 0
-	, Name := SubStr(ToConvert, InStr(ToConvert, "\",, 0)+1)
+	, Name := SubStr(ToConvert, InStr(ToConvert, "\",, 0)+1) ; Get the name of the file
 
 	if !(f := FileExist(ToConvert))
 		throw Exception("ERROR: Not a valid path!!!",, 0)
-	; If a file has "EG_" in its name it most likely means it was already converted
+	; If a file has "EG_" in at the beginning of its name it likely means it was already converted
+	; and vice versa for "Steam_"
 	if (InStr(ToConvert, "EG_", true) && !(InStr(f, "D")) && SteamToEpic)
 		throw Exception("File already converted",, 1)
 	else if (InStr(ToConvert, "Steam_", true) && !(InStr(f, "D")) && EpicToSteam)
@@ -77,9 +77,7 @@ Check(ToConvert){
 		catch c {
 			throw c
 		}
-	}
-	else if (InStr(f, "D")) {
-		GuiControl, Show, ProgressBar
+	} else if (InStr(f, "D")) {
 		; Loop through the folder and convert all the savefiles in it
 		Loop, Files, % ToConvert "\*.sgd"
 		{
@@ -90,11 +88,10 @@ Check(ToConvert){
 					MsgBox, % c.Extra ? 48 : 16, Savefile Converter, % c.Message
 					continue
 				}
-				GuiControl,, ProgressBar, % "+" . Mod(file_count, 100)
 				file_count++
 			}
 		}
-		GuiControl, Hide, ProgressBar
+		; File count of zero means nothing to convert
 		if (file_count <= 0)
 			throw Exception("All savefiles in """ Name """ are already converted" ,, 1)
 	} else if !(SubStr(Name, InStr(Name, ".",, 0)) == ".sgd")
@@ -109,10 +106,16 @@ Converter(ToConvert, Name){
 		NewFile := SubStr(ToConvert, 1, -StrLen(Name)) . "Steam_" . Name
 		, SteamF := FileOpen(NewFile, "w")
 		, EGF := FileOpen(ToConvert, "r")
-		, l := EGF.Length/1024
+		, l := EGF.Length
 		
-		if (l == 288 || l == 2372)
+		; If the file has these sizes it means it is a Steam save
+		; this only works for City and Knight, as Asylum has varying file sizes
+		if (l == 294912 || l == 2428928){
+			SteamF.Close()
+			EGF.Close()
+			FileDelete, % NewFile
 			throw Exception("ERRORR: Make sure you have the correct conversion option checked!!")
+		}
 		
 		; Advance file pointer 4 bytes
 		EGF.Seek(4)
@@ -141,7 +144,7 @@ Converter(ToConvert, Name){
 			SteamF.Close()
 			EGF.Close()
 			FileDelete, % NewFile
-			throw Exception("ERROR: Unable to convert """ Name """. Invaild file size. Make sure you have the correct conversion option checked!!",, 0)
+			throw Exception("ERROR: Unable to convert """ Name """. Invalid file size. Make sure you have the correct conversion option checked!!",, 0)
 		}
 		; Insert the required bytes at the beginning of the file, depending on the choice of game
 		Loop, Parse, % EGbytes[Game], % " "
