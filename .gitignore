@@ -1,0 +1,10 @@
+old/
+
+*.png
+*.jpg
+*.zip
+*.psd
+*.exe
+*.txt
+**/*.md
+.vscode
